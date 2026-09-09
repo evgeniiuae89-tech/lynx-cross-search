@@ -404,17 +404,8 @@ st.html(
 
 
     /* ======================================================
-       RESULTS TOOLBAR
+       RESULTS
     ====================================================== */
-
-    .results-toolbar-title {
-        color: #777773;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 1px;
-        margin-top: 5px;
-        margin-bottom: 2px;
-    }
 
     .results-count {
         color: #777773;
@@ -776,7 +767,6 @@ def search_crosses(
         )
 
 
-        # EMPTY ROW
         if not has_numbers:
 
             results.append({
@@ -791,7 +781,6 @@ def search_crosses(
             continue
 
 
-        # MATCHES
         if matches.empty:
 
             row_matches = pd.DataFrame()
@@ -803,7 +792,6 @@ def search_crosses(
             ].copy()
 
 
-        # NOT FOUND
         if row_matches.empty:
 
             results.append({
@@ -818,7 +806,6 @@ def search_crosses(
             continue
 
 
-        # REMOVE DUPLICATES
         row_matches = row_matches.drop_duplicates(
             subset=[
                 "lynx_number",
@@ -828,7 +815,6 @@ def search_crosses(
         )
 
 
-        # FOUND
         for _, match in row_matches.iterrows():
 
             results.append({
@@ -956,77 +942,27 @@ def filter_results(
 
 
 # ============================================================
-# TABLE STYLE
+# BUILD DISPLAY TABLE
 # ============================================================
 
-def style_results_table(df):
+def build_display_table(df):
 
-    styled = df.style
+    display_df = df.copy()
 
-
-    def status_style(value):
-
-        if value == "Found":
-
-            return (
-                "background-color:#eaf6ec;"
-                "color:#237a37;"
-                "font-weight:700;"
+    display_df["LYNXauto Number"] = (
+        display_df["LYNXauto Number"]
+        .fillna("")
+        .astype(str)
+        .apply(
+            lambda value: (
+                f"https://ecatalogue.lynxauto.jp/{value.strip()}.html"
+                if value.strip()
+                else ""
             )
-
-        if value == "Not Found":
-
-            return (
-                "background-color:#fdecec;"
-                "color:#c53932;"
-                "font-weight:700;"
-            )
-
-        return ""
-
-
-    def cross_type_style(value):
-
-        if value == "OEM":
-
-            return (
-                "background-color:#eeeeec;"
-                "color:#454541;"
-                "font-weight:700;"
-            )
-
-        if value == "Aftermarket":
-
-            return (
-                "background-color:#fff0ee;"
-                "color:#c7443e;"
-                "font-weight:700;"
-            )
-
-        return ""
-
-
-    styled = styled.map(
-        status_style,
-        subset=["Status"]
+        )
     )
 
-    styled = styled.map(
-        cross_type_style,
-        subset=["Cross Type"]
-    )
-
-    styled = styled.map(
-        lambda value: (
-            "font-weight:700;"
-            "color:#252525;"
-            if str(value).strip()
-            else ""
-        ),
-        subset=["LYNXauto Number"]
-    )
-
-    return styled
+    return display_df
 
 
 # ============================================================
@@ -1339,13 +1275,17 @@ search_button = st.button(
 
 
 # ============================================================
-# STORE RESULTS
+# SESSION STATE
 # ============================================================
 
 if "search_results" not in st.session_state:
 
     st.session_state.search_results = None
 
+
+# ============================================================
+# RUN SEARCH
+# ============================================================
 
 if search_button:
 
@@ -1401,7 +1341,7 @@ if st.session_state.search_results is not None:
 
 
     # ========================================================
-    # TITLE
+    # RESULTS TITLE
     # ========================================================
 
     st.html(
@@ -1473,10 +1413,10 @@ if st.session_state.search_results is not None:
 
 
     # ========================================================
-    # FILTER DISPLAY DATA
+    # FILTER RESULTS
     # ========================================================
 
-    display_df = filter_results(
+    filtered_df = filter_results(
         df,
         result_status_filter,
         result_search
@@ -1516,7 +1456,7 @@ if st.session_state.search_results is not None:
     st.html(
         f"""
         <div class="results-count">
-            Showing <strong>{len(display_df):,}</strong>
+            Showing <strong>{len(filtered_df):,}</strong>
             of <strong>{len(df):,}</strong> result rows
         </div>
         """
@@ -1524,15 +1464,24 @@ if st.session_state.search_results is not None:
 
 
     # ========================================================
-    # DYNAMIC TABLE HEIGHT
+    # TABLE HEIGHT
     # ========================================================
 
     table_height = min(
         max(
             180,
-            42 + len(display_df) * 35
+            42 + len(filtered_df) * 35
         ),
         520
+    )
+
+
+    # ========================================================
+    # BUILD CLICKABLE TABLE
+    # ========================================================
+
+    display_table = build_display_table(
+        filtered_df
     )
 
 
@@ -1540,13 +1489,8 @@ if st.session_state.search_results is not None:
     # TABLE
     # ========================================================
 
-    styled_df = style_results_table(
-        display_df
-    )
-
-
     st.dataframe(
-        styled_df,
+        display_table,
         width="stretch",
         height=table_height,
         hide_index=True,
@@ -1575,9 +1519,16 @@ if st.session_state.search_results is not None:
                 ),
 
             "LYNXauto Number":
-                st.column_config.TextColumn(
+                st.column_config.LinkColumn(
                     "LYNXauto Number",
-                    width="medium"
+                    width="medium",
+                    help=(
+                        "Click the LYNX number to open "
+                        "the official LYNX e-catalogue"
+                    ),
+                    display_text=(
+                        r"https://ecatalogue\.lynxauto\.jp/(.*?)\.html"
+                    )
                 ),
 
             "Description":
