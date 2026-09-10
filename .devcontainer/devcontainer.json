@@ -1,7 +1,8 @@
 {
-  "name": "Python 3.14",
-  // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+  "name": "LYNX Cross Search",
+
   "image": "mcr.microsoft.com/devcontainers/python:3-3.14-bookworm",
+
   "customizations": {
     "codespaces": {
       "openFiles": [
@@ -9,6 +10,7 @@
         "streamlit_app.py"
       ]
     },
+
     "vscode": {
       "settings": {},
       "extensions": [
@@ -17,16 +19,20 @@
       ]
     }
   },
-  "updateContentCommand": "if [ -f packages.txt ]; then sudo apt update && sudo apt upgrade -y && sudo xargs apt install -y < packages.txt; fi; if ! command -v uv >/dev/null 2>&1; then curl -LsSf https://astral.sh/uv/install.sh | sh; fi; UV_BIN=$(command -v uv || echo \"$HOME/.local/bin/uv\"); UV_PROJECT_ENVIRONMENT=\"$HOME/.venvs/blank-app-template\" \"$UV_BIN\" sync",
+
+  "updateContentCommand": "if [ -f packages.txt ]; then sudo apt update && sudo xargs apt install -y < packages.txt; fi; python -m pip install --upgrade pip && python -m pip install -r requirements.txt",
+
   "postAttachCommand": {
-    "server": "UV_BIN=$(command -v uv || echo \"$HOME/.local/bin/uv\"); UV_PROJECT_ENVIRONMENT=\"$HOME/.venvs/blank-app-template\" \"$UV_BIN\" run streamlit run streamlit_app.py --server.enableCORS false --server.enableXsrfProtection false"
+    "server": "python -m streamlit run streamlit_app.py --server.address 0.0.0.0 --server.port 8501 --server.enableCORS false --server.enableXsrfProtection false"
   },
+
   "portsAttributes": {
     "8501": {
-      "label": "Application",
-      "onAutoForward": "openPreview"
+      "label": "LYNX Cross Search",
+      "onAutoForward": "openBrowser"
     }
   },
+
   "forwardPorts": [
     8501
   ]
