@@ -2115,29 +2115,39 @@ if st.session_state.search_results is not None:
         <div class="section-title">
             <div class="section-red-line"></div>
             Add Manual Cross
-        </div>
-        """
-    )
+    </div>
+    """
+)
 
 
     customer_positions = (
-        df[
-            df["Customer Part Number"]
-            .fillna("")
-            .astype(str)
-            .str.strip()
-            != ""
-        ][
-            [
-                "No.",
-                "Customer Part Number"
+            df[
+                (
+                    df["Customer Part Number"]
+                    .fillna("")
+                    .astype(str)
+                    .str.strip()
+                    != ""
+                )
+                &
+                (
+                    df["Status"]
+                    .fillna("")
+                    .astype(str)
+                    .str.strip()
+                    == "Not Found"
+                )
+            ][
+                [
+                    "No.",
+                    "Customer Part Number"
+                ]
             ]
-        ]
-        .drop_duplicates(
-            subset=["No."]
+            .drop_duplicates(
+                subset=["No."]
+            )
+            .sort_values("No.")
         )
-        .sort_values("No.")
-    )
 
 
     position_options = {}
@@ -2263,7 +2273,13 @@ if st.session_state.search_results is not None:
                 )
 
 
-    # ========================================================
+    else:
+
+        st.success(
+            "All customer positions have matches."
+        )
+
+        # ========================================================
     # REMOVE MANUAL CROSS
     # ========================================================
 
