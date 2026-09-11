@@ -1,10 +1,17 @@
 import re
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import duckdb
 import pandas as pd
 import streamlit as st
+
+from openpyxl import Workbook
+from openpyxl.drawing.image import Image as XLImage
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 
 # ============================================================
@@ -19,6 +26,8 @@ st.set_page_config(
 )
 
 DATABASE_FILE = "lynx_cross.duckdb"
+LOGO_FILE = Path("assets/akita_lynx_logo.png")
+DUBAI_TIMEZONE = ZoneInfo("Asia/Dubai")
 
 
 # ============================================================
@@ -56,9 +65,7 @@ st.html(
     }
 
 
-    /* ======================================================
-       HEADER
-    ====================================================== */
+    /* HEADER */
 
     .lynx-header {
         background: linear-gradient(
@@ -146,9 +153,7 @@ st.html(
     }
 
 
-    /* ======================================================
-       HERO
-    ====================================================== */
+    /* HERO */
 
     .lynx-hero {
         background: linear-gradient(
@@ -213,9 +218,7 @@ st.html(
     }
 
 
-    /* ======================================================
-       WORKSPACE
-    ====================================================== */
+    /* WORKSPACE */
 
     .workspace-title {
         margin-top: 24px;
@@ -232,9 +235,7 @@ st.html(
     }
 
 
-    /* ======================================================
-       INPUTS
-    ====================================================== */
+    /* INPUTS */
 
     label {
         color: #454541 !important;
@@ -275,9 +276,7 @@ st.html(
     }
 
 
-    /* ======================================================
-       RADIO
-    ====================================================== */
+    /* RADIO */
 
     div[role="radiogroup"] {
         gap: 10px;
@@ -296,9 +295,7 @@ st.html(
     }
 
 
-    /* ======================================================
-       BUTTONS
-    ====================================================== */
+    /* BUTTONS */
 
     .stButton > button {
         background: linear-gradient(
@@ -343,9 +340,7 @@ st.html(
     }
 
 
-    /* ======================================================
-       SEARCH TIPS
-    ====================================================== */
+    /* SEARCH TIPS */
 
     .search-tips {
         background: #454541;
@@ -366,9 +361,7 @@ st.html(
     }
 
 
-    /* ======================================================
-       METRICS
-    ====================================================== */
+    /* METRICS */
 
     div[data-testid="stMetric"] {
         background: white;
@@ -390,9 +383,7 @@ st.html(
     }
 
 
-    /* ======================================================
-       DATAFRAME
-    ====================================================== */
+    /* DATAFRAME */
 
     div[data-testid="stDataFrame"] {
         background: white;
@@ -403,9 +394,7 @@ st.html(
     }
 
 
-    /* ======================================================
-       RESULTS
-    ====================================================== */
+    /* RESULTS */
 
     .results-count {
         color: #777773;
@@ -415,9 +404,7 @@ st.html(
     }
 
 
-    /* ======================================================
-       FILE UPLOADER
-    ====================================================== */
+    /* FILE UPLOADER */
 
     section[data-testid="stFileUploaderDropzone"] {
         background: white !important;
@@ -426,9 +413,7 @@ st.html(
     }
 
 
-    /* ======================================================
-       UPLOAD INFO
-    ====================================================== */
+    /* UPLOAD INFO */
 
     .upload-ready {
         background: white;
@@ -445,9 +430,7 @@ st.html(
     }
 
 
-    /* ======================================================
-       SECTION TITLE
-    ====================================================== */
+    /* SECTION TITLE */
 
     .section-title {
         display: flex;
@@ -468,9 +451,7 @@ st.html(
     }
 
 
-    /* ======================================================
-       FOOTER
-    ====================================================== */
+    /* FOOTER */
 
     .lynx-footer {
         margin-top: 32px;
@@ -481,10 +462,6 @@ st.html(
         font-size: 11px;
     }
 
-
-    /* ======================================================
-       RESPONSIVE
-    ====================================================== */
 
     @media (max-width: 900px) {
 
@@ -818,8 +795,7 @@ def search_crosses(
         for _, match in row_matches.iterrows():
 
             results.append({
-                "No.":
-                    row_no,
+                "No.": row_no,
 
                 "Customer Part Number":
                     customer_display,
@@ -844,37 +820,774 @@ def search_crosses(
 
 
 # ============================================================
+# ADD MANUAL CROSS
+# ============================================================
+
+def add_manual_cross(
+    df,
+    row_no,
+    lynx_number,
+    description=""
+):
+
+    updated_df = df.copy()
+
+    lynx_number = str(
+        lynx_number
+    ).strip().upper()
+
+    description = str(
+        description
+    ).strip()
+
+
+    if not lynx_number:
+
+        return (
+            updated_df,
+            False,
+            "Please enter LYNXauto Number."
+        )
+
+
+    selected_rows = updated_df[
+        updated_df["No."] == row_no
+    ]
+
+
+    if selected_rows.empty:
+
+        return (
+            updated_df,
+            False,
+            "Customer position was not found."
+        )
+
+
+    customer_part_number = str(
+        selected_rows.iloc[0][
+            "Customer Part Number"
+        ]
+    )
+
+
+    existing_numbers = (
+        selected_rows[
+            "LYNXauto Number"
+        ]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        .str.upper()
+    )
+
+
+    if lynx_number in existing_numbers.values:
+
+        return (
+            updated_df,
+            False,
+            f"{lynx_number} is already added "
+            "to this customer position."
+        )
+
+
+    # Remove Not Found placeholder
+    updated_df = updated_df[
+        ~(
+            (updated_df["No."] == row_no)
+            &
+            (updated_df["Status"] == "Not Found")
+        )
+    ].copy()
+
+
+    manual_row = pd.DataFrame(
+        [
+            {
+                "No.": row_no,
+                "Customer Part Number":
+                    customer_part_number,
+                "LYNXauto Number":
+                    lynx_number,
+                "Description":
+                    description,
+                "Cross Type":
+                    "Manual",
+                "Status":
+                    "Found"
+            }
+        ]
+    )
+
+
+    updated_df = pd.concat(
+        [
+            updated_df,
+            manual_row
+        ],
+        ignore_index=True
+    )
+
+
+    updated_df = (
+        updated_df
+        .sort_values(
+            by=["No."],
+            kind="stable"
+        )
+        .reset_index(drop=True)
+    )
+
+
+    return (
+        updated_df,
+        True,
+        f"{lynx_number} added successfully."
+    )
+
+
+# ============================================================
+# REMOVE MANUAL CROSS
+# ============================================================
+
+def remove_manual_cross(
+    df,
+    row_no,
+    lynx_number
+):
+
+    updated_df = df.copy()
+
+    lynx_number = str(
+        lynx_number
+    ).strip().upper()
+
+
+    target_rows = updated_df[
+        (updated_df["No."] == row_no)
+        &
+        (
+            updated_df["LYNXauto Number"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.upper()
+            == lynx_number
+        )
+        &
+        (
+            updated_df["Cross Type"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            == "Manual"
+        )
+    ]
+
+
+    if target_rows.empty:
+
+        return (
+            updated_df,
+            False,
+            "Manual cross was not found."
+        )
+
+
+    customer_part_number = str(
+        target_rows.iloc[0][
+            "Customer Part Number"
+        ]
+    )
+
+
+    # Remove selected manual cross
+    updated_df = updated_df[
+        ~(
+            (updated_df["No."] == row_no)
+            &
+            (
+                updated_df["LYNXauto Number"]
+                .fillna("")
+                .astype(str)
+                .str.strip()
+                .str.upper()
+                == lynx_number
+            )
+            &
+            (
+                updated_df["Cross Type"]
+                .fillna("")
+                .astype(str)
+                .str.strip()
+                == "Manual"
+            )
+        )
+    ].copy()
+
+
+    # Check if anything remains for this customer position
+    remaining_rows = updated_df[
+        updated_df["No."] == row_no
+    ]
+
+
+    # If nothing remains, restore Not Found
+    if remaining_rows.empty:
+
+        not_found_row = pd.DataFrame(
+            [
+                {
+                    "No.": row_no,
+                    "Customer Part Number":
+                        customer_part_number,
+                    "LYNXauto Number":
+                        "",
+                    "Description":
+                        "",
+                    "Cross Type":
+                        "",
+                    "Status":
+                        "Not Found"
+                }
+            ]
+        )
+
+
+        updated_df = pd.concat(
+            [
+                updated_df,
+                not_found_row
+            ],
+            ignore_index=True
+        )
+
+
+    updated_df = (
+        updated_df
+        .sort_values(
+            by=["No."],
+            kind="stable"
+        )
+        .reset_index(drop=True)
+    )
+
+
+    return (
+        updated_df,
+        True,
+        f"{lynx_number} removed successfully."
+    )
+
+
+# ============================================================
 # EXCEL EXPORT
 # ============================================================
 
-def create_excel_download(df):
+def create_excel_download(
+    df,
+    sales_manager,
+    reference_no,
+    report_datetime
+):
 
     output = BytesIO()
 
-    with pd.ExcelWriter(
-        output,
-        engine="openpyxl"
-    ) as writer:
+    workbook = Workbook()
 
-        df.to_excel(
-            writer,
-            sheet_name="Cross Results",
-            index=False
+    worksheet = workbook.active
+    worksheet.title = "Cross References"
+
+    # Hide Excel gridlines
+    worksheet.sheet_view.showGridLines = False
+
+
+    # ========================================================
+    # COLORS
+    # ========================================================
+
+    dark_fill = PatternFill(
+        "solid",
+        fgColor="202427"
+    )
+
+    red_fill = PatternFill(
+        "solid",
+        fgColor="E30613"
+    )
+
+    label_fill = PatternFill(
+        "solid",
+        fgColor="F2F2F2"
+    )
+
+    found_fill = PatternFill(
+        "solid",
+        fgColor="E2F0D9"
+    )
+
+    not_found_fill = PatternFill(
+        "solid",
+        fgColor="FCE4D6"
+    )
+
+    label_font = Font(
+        color="222222",
+        bold=True,
+        size=11
+    )
+
+    thin_border = Border(
+        left=Side(
+            style="thin",
+            color="D0D0D0"
+        ),
+        right=Side(
+            style="thin",
+            color="D0D0D0"
+        ),
+        top=Side(
+            style="thin",
+            color="D0D0D0"
+        ),
+        bottom=Side(
+            style="thin",
+            color="D0D0D0"
+        )
+    )
+
+
+    # ========================================================
+    # COLUMN WIDTHS
+    # ========================================================
+
+    worksheet.column_dimensions["A"].width = 11
+    worksheet.column_dimensions["B"].width = 30
+    worksheet.column_dimensions["C"].width = 22
+    worksheet.column_dimensions["D"].width = 36
+    worksheet.column_dimensions["E"].width = 21
+    worksheet.column_dimensions["F"].width = 18
+
+
+    # ========================================================
+    # ROW HEIGHTS
+    # ========================================================
+
+    worksheet.row_dimensions[1].height = 48
+    worksheet.row_dimensions[2].height = 44
+    worksheet.row_dimensions[3].height = 38
+    worksheet.row_dimensions[4].height = 8
+    worksheet.row_dimensions[5].height = 8
+    worksheet.row_dimensions[6].height = 26
+    worksheet.row_dimensions[7].height = 26
+    worksheet.row_dimensions[8].height = 8
+    worksheet.row_dimensions[9].height = 30
+
+
+    # ========================================================
+    # LOGO
+    # ========================================================
+
+    if LOGO_FILE.exists():
+
+        logo = XLImage(
+            str(LOGO_FILE)
         )
 
-        worksheet = writer.book[
-            "Cross Results"
+        logo.width = 320
+        logo.height = 112
+
+        worksheet.add_image(
+            logo,
+            "A1"
+        )
+
+
+    # ========================================================
+    # TITLE
+    # ========================================================
+
+    worksheet.merge_cells(
+        "D1:F2"
+    )
+
+    worksheet["D1"] = (
+        "CROSS REFERENCES"
+    )
+
+    worksheet["D1"].font = Font(
+        bold=True,
+        size=24,
+        color="202427"
+    )
+
+    worksheet["D1"].alignment = Alignment(
+        horizontal="center",
+        vertical="center"
+    )
+
+
+    worksheet.merge_cells(
+        "D3:F3"
+    )
+
+    worksheet["D3"] = (
+        "AKITA Spare Parts Trading • "
+        "LYNX Spare Parts"
+    )
+
+    worksheet["D3"].font = Font(
+        size=11,
+        color="555555"
+    )
+
+    worksheet["D3"].alignment = Alignment(
+        horizontal="center",
+        vertical="center"
+    )
+
+
+    # ========================================================
+    # RED DIVIDER
+    # ========================================================
+
+    for column in range(1, 7):
+
+        worksheet.cell(
+            row=4,
+            column=column
+        ).fill = red_fill
+
+
+    # ========================================================
+    # REPORT INFO
+    # ========================================================
+
+    worksheet["A6"] = "Sales Manager"
+
+    worksheet.merge_cells(
+        "B6:C6"
+    )
+
+    worksheet["B6"] = sales_manager
+
+
+    worksheet["D6"] = "Date"
+
+    worksheet.merge_cells(
+        "E6:F6"
+    )
+
+    worksheet["E6"] = (
+        report_datetime.strftime(
+            "%d %B %Y"
+        )
+    )
+
+
+    worksheet["A7"] = "Reference"
+
+    worksheet.merge_cells(
+        "B7:C7"
+    )
+
+    worksheet["B7"] = reference_no
+
+
+    worksheet["D7"] = "Prepared by"
+
+    worksheet.merge_cells(
+        "E7:F7"
+    )
+
+    worksheet["E7"] = (
+        "Technical Product Department"
+    )
+
+
+    info_ranges = [
+        "A6:C6",
+        "D6:F6",
+        "A7:C7",
+        "D7:F7"
+    ]
+
+
+    for range_ref in info_ranges:
+
+        for row in worksheet[
+            range_ref
+        ]:
+
+            for cell in row:
+
+                cell.border = thin_border
+
+                cell.alignment = Alignment(
+                    vertical="center"
+                )
+
+
+    for cell_ref in [
+        "A6",
+        "D6",
+        "A7",
+        "D7"
+    ]:
+
+        cell = worksheet[
+            cell_ref
         ]
 
-        worksheet.freeze_panes = "A2"
-        worksheet.auto_filter.ref = worksheet.dimensions
+        cell.fill = label_fill
+        cell.font = label_font
 
-        worksheet.column_dimensions["A"].width = 9
-        worksheet.column_dimensions["B"].width = 48
-        worksheet.column_dimensions["C"].width = 22
-        worksheet.column_dimensions["D"].width = 36
-        worksheet.column_dimensions["E"].width = 18
-        worksheet.column_dimensions["F"].width = 16
+
+    # ========================================================
+    # TABLE HEADER
+    # ========================================================
+
+    headers = [
+        "No.",
+        "Customer Part Number",
+        "LYNXauto Number",
+        "Description",
+        "Cross Type",
+        "Status"
+    ]
+
+
+    for column_index, header in enumerate(
+        headers,
+        start=1
+    ):
+
+        cell = worksheet.cell(
+            row=9,
+            column=column_index,
+            value=header
+        )
+
+        cell.fill = dark_fill
+
+        cell.font = Font(
+            color="FFFFFF",
+            bold=True,
+            size=11
+        )
+
+        cell.alignment = Alignment(
+            horizontal="center",
+            vertical="center",
+            wrap_text=True
+        )
+
+        cell.border = thin_border
+
+
+    # ========================================================
+    # DATA
+    # ========================================================
+
+    start_row = 10
+
+
+    for row_index, (_, row) in enumerate(
+        df.iterrows(),
+        start=start_row
+    ):
+
+        values = [
+            row["No."],
+            row["Customer Part Number"],
+            row["LYNXauto Number"],
+            row["Description"],
+            row["Cross Type"],
+            row["Status"]
+        ]
+
+
+        for column_index, value in enumerate(
+            values,
+            start=1
+        ):
+
+            cell = worksheet.cell(
+                row=row_index,
+                column=column_index,
+                value=value
+            )
+
+            cell.border = thin_border
+
+            cell.alignment = Alignment(
+                vertical="center",
+                wrap_text=True
+            )
+
+
+        # LYNX hyperlink
+
+        lynx_number = str(
+            row["LYNXauto Number"]
+        ).strip()
+
+
+        if lynx_number:
+
+            lynx_cell = worksheet.cell(
+                row=row_index,
+                column=3
+            )
+
+            lynx_cell.hyperlink = (
+                "https://ecatalogue."
+                "lynxauto.jp/"
+                f"{lynx_number}.html"
+            )
+
+            lynx_cell.font = Font(
+                color="0563C1",
+                bold=True,
+                underline="single"
+            )
+
+            lynx_cell.alignment = Alignment(
+                horizontal="center",
+                vertical="center"
+            )
+
+
+        # Status
+
+        status = str(
+            row["Status"]
+        ).strip()
+
+
+        status_cell = worksheet.cell(
+            row=row_index,
+            column=6
+        )
+
+
+        if status == "Found":
+
+            status_cell.fill = (
+                found_fill
+            )
+
+            status_cell.font = Font(
+                color="375623",
+                bold=True
+            )
+
+
+        elif status == "Not Found":
+
+            status_cell.fill = (
+                not_found_fill
+            )
+
+            status_cell.font = Font(
+                color="C00000",
+                bold=True
+            )
+
+
+        status_cell.alignment = Alignment(
+            horizontal="center",
+            vertical="center"
+        )
+
+
+        worksheet.cell(
+            row=row_index,
+            column=1
+        ).alignment = Alignment(
+            horizontal="center",
+            vertical="center"
+        )
+
+
+        worksheet.cell(
+            row=row_index,
+            column=5
+        ).alignment = Alignment(
+            horizontal="center",
+            vertical="center"
+        )
+
+
+    # ========================================================
+    # EXCEL TABLE
+    # ========================================================
+
+    last_row = (
+        start_row
+        + len(df)
+        - 1
+    )
+
+
+    if last_row >= start_row:
+
+        table = Table(
+            displayName="CrossReferencesTable",
+            ref=f"A9:F{last_row}"
+        )
+
+        style = TableStyleInfo(
+            name="TableStyleMedium2",
+            showFirstColumn=False,
+            showLastColumn=False,
+            showRowStripes=True,
+            showColumnStripes=False
+        )
+
+        table.tableStyleInfo = style
+
+        worksheet.add_table(
+            table
+        )
+
+
+    # ========================================================
+    # FREEZE
+    # ========================================================
+
+    worksheet.freeze_panes = "A10"
+
+
+    # ========================================================
+    # PRINT SETTINGS
+    # ========================================================
+
+    worksheet.sheet_properties.pageSetUpPr.fitToPage = True
+
+    worksheet.page_setup.fitToWidth = 1
+    worksheet.page_setup.fitToHeight = 0
+
+
+    if last_row >= start_row:
+
+        worksheet.print_area = (
+            f"A1:F{last_row}"
+        )
+
+    else:
+
+        worksheet.print_area = "A1:F10"
+
+
+    # ========================================================
+    # SAVE
+    # ========================================================
+
+    workbook.save(
+        output
+    )
 
     output.seek(0)
 
@@ -920,6 +1633,7 @@ def filter_results(
             index=filtered.index
         )
 
+
         for column in searchable_columns:
 
             mask = mask | (
@@ -932,6 +1646,7 @@ def filter_results(
                     regex=False
                 )
             )
+
 
         filtered = filtered[
             mask
@@ -949,6 +1664,7 @@ def build_display_table(df):
 
     display_df = df.copy()
 
+
     display_df["LYNXauto Number"] = (
         display_df["LYNXauto Number"]
         .fillna("")
@@ -962,6 +1678,7 @@ def build_display_table(df):
         )
     )
 
+
     return display_df
 
 
@@ -972,6 +1689,7 @@ def build_display_table(df):
 database_path = Path(
     DATABASE_FILE
 )
+
 
 if not database_path.exists():
 
@@ -1063,6 +1781,20 @@ st.html(
 
 
 # ============================================================
+# SALES MANAGER
+# ============================================================
+
+sales_manager = st.text_input(
+    "Sales Manager",
+    placeholder="Enter Sales Manager name...",
+    help=(
+        "This name will be shown "
+        "in the exported Cross References report."
+    )
+)
+
+
+# ============================================================
 # INPUT MODE
 # ============================================================
 
@@ -1107,9 +1839,11 @@ if input_mode == "Manual Search":
             )
         )
 
+
         manual_values = (
             customer_input.splitlines()
         )
+
 
         prepared_rows = prepare_customer_rows(
             manual_values
@@ -1126,6 +1860,7 @@ if input_mode == "Manual Search":
                 "Aftermarket"
             ]
         )
+
 
         st.html(
             """
@@ -1159,6 +1894,7 @@ else:
         ]
     )
 
+
     uploaded_file = st.file_uploader(
         "Upload Customer Excel File",
         type=["xlsx"]
@@ -1173,6 +1909,7 @@ else:
                 uploaded_file,
                 engine="openpyxl"
             )
+
 
             col1, col2 = st.columns(2)
 
@@ -1283,19 +2020,70 @@ if "search_results" not in st.session_state:
     st.session_state.search_results = None
 
 
+if "report_reference" not in st.session_state:
+
+    st.session_state.report_reference = None
+
+
+if "report_datetime" not in st.session_state:
+
+    st.session_state.report_datetime = None
+
+
+if "report_sales_manager" not in st.session_state:
+
+    st.session_state.report_sales_manager = ""
+
+
 # ============================================================
 # RUN SEARCH
 # ============================================================
 
 if search_button:
 
-    if not prepared_rows:
+    if not sales_manager.strip():
+
+        st.warning(
+            "Please enter Sales Manager name."
+        )
+
+
+    elif not prepared_rows:
 
         st.warning(
             "No customer data is available for search."
         )
 
+
     else:
+
+        report_datetime = datetime.now(
+            DUBAI_TIMEZONE
+        )
+
+
+        reference_no = (
+            "CR-"
+            + report_datetime.strftime(
+                "%Y-%m%d-%H%M"
+            )
+        )
+
+
+        st.session_state.report_datetime = (
+            report_datetime
+        )
+
+
+        st.session_state.report_reference = (
+            reference_no
+        )
+
+
+        st.session_state.report_sales_manager = (
+            sales_manager.strip()
+        )
+
 
         with st.spinner(
             "Searching LYNXauto database..."
@@ -1317,6 +2105,312 @@ if st.session_state.search_results is not None:
 
     df = st.session_state.search_results
 
+
+    # ========================================================
+    # ADD MANUAL CROSS
+    # ========================================================
+
+    st.html(
+        """
+        <div class="section-title">
+            <div class="section-red-line"></div>
+            Add Manual Cross
+        </div>
+        """
+    )
+
+
+    customer_positions = (
+        df[
+            df["Customer Part Number"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            != ""
+        ][
+            [
+                "No.",
+                "Customer Part Number"
+            ]
+        ]
+        .drop_duplicates(
+            subset=["No."]
+        )
+        .sort_values("No.")
+    )
+
+
+    position_options = {}
+
+
+    for _, position_row in (
+        customer_positions.iterrows()
+    ):
+
+        row_no = int(
+            position_row["No."]
+        )
+
+        customer_number = str(
+            position_row[
+                "Customer Part Number"
+            ]
+        )
+
+
+        label = (
+            f"{row_no}. "
+            f"{customer_number}"
+        )
+
+
+        position_options[
+            label
+        ] = row_no
+
+
+    if position_options:
+
+        manual_col1, manual_col2, manual_col3 = (
+            st.columns(
+                [2.2, 1.4, 2.4]
+            )
+        )
+
+
+        with manual_col1:
+
+            selected_position_label = (
+                st.selectbox(
+                    "Customer Position",
+                    list(
+                        position_options.keys()
+                    ),
+                    key="manual_customer_position"
+                )
+            )
+
+
+        with manual_col2:
+
+            manual_lynx_number = (
+                st.text_input(
+                    "LYNXauto Number",
+                    placeholder="e.g. G32877LR",
+                    key="manual_lynx_number"
+                )
+            )
+
+
+        with manual_col3:
+
+            manual_description = (
+                st.text_input(
+                    "Description (optional)",
+                    placeholder=(
+                        "Enter product description..."
+                    ),
+                    key="manual_description"
+                )
+            )
+
+
+        add_manual_button = st.button(
+            "ADD MANUAL CROSS",
+            width="stretch",
+            key="add_manual_cross_button"
+        )
+
+
+        if add_manual_button:
+
+            selected_row_no = (
+                position_options[
+                    selected_position_label
+                ]
+            )
+
+
+            (
+                updated_results,
+                success,
+                message
+            ) = add_manual_cross(
+                st.session_state.search_results,
+                selected_row_no,
+                manual_lynx_number,
+                manual_description
+            )
+
+
+            if success:
+
+                st.session_state.search_results = (
+                    updated_results
+                )
+
+                st.success(
+                    message
+                )
+
+                st.rerun()
+
+
+            else:
+
+                st.warning(
+                    message
+                )
+
+
+    # ========================================================
+    # REMOVE MANUAL CROSS
+    # ========================================================
+
+    df = st.session_state.search_results
+
+
+    manual_rows = df[
+        df["Cross Type"]
+        .fillna("")
+        .astype(str)
+        .str.strip()
+        == "Manual"
+    ].copy()
+
+
+    if not manual_rows.empty:
+
+        st.html(
+            """
+            <div class="section-title">
+                <div class="section-red-line"></div>
+                Remove Manual Cross
+            </div>
+            """
+        )
+
+
+        manual_cross_options = {}
+
+
+        for _, manual_row in (
+            manual_rows.iterrows()
+        ):
+
+            row_no = int(
+                manual_row["No."]
+            )
+
+            customer_number = str(
+                manual_row[
+                    "Customer Part Number"
+                ]
+            )
+
+            lynx_number = str(
+                manual_row[
+                    "LYNXauto Number"
+                ]
+            )
+
+
+            label = (
+                f"{row_no}. "
+                f"{customer_number} → "
+                f"{lynx_number}"
+            )
+
+
+            manual_cross_options[
+                label
+            ] = (
+                row_no,
+                lynx_number
+            )
+
+
+        remove_col1, remove_col2 = (
+            st.columns(
+                [4, 1]
+            )
+        )
+
+
+        with remove_col1:
+
+            selected_manual_cross = (
+                st.selectbox(
+                    "Manual Cross",
+                    list(
+                        manual_cross_options.keys()
+                    ),
+                    key="remove_manual_cross_select"
+                )
+            )
+
+
+        with remove_col2:
+
+            st.write("")
+
+            st.write("")
+
+            remove_manual_button = st.button(
+                "REMOVE",
+                width="stretch",
+                key="remove_manual_cross_button"
+            )
+
+
+        if remove_manual_button:
+
+            (
+                remove_row_no,
+                remove_lynx_number
+            ) = manual_cross_options[
+                selected_manual_cross
+            ]
+
+
+            (
+                updated_results,
+                success,
+                message
+            ) = remove_manual_cross(
+                st.session_state.search_results,
+                remove_row_no,
+                remove_lynx_number
+            )
+
+
+            if success:
+
+                st.session_state.search_results = (
+                    updated_results
+                )
+
+                st.success(
+                    message
+                )
+
+                st.rerun()
+
+
+            else:
+
+                st.warning(
+                    message
+                )
+
+
+    # Refresh dataframe
+    df = st.session_state.search_results
+
+
+    # ========================================================
+    # COUNTERS
+    # ========================================================
 
     found_count = len(
         df[
@@ -1424,11 +2518,33 @@ if st.session_state.search_results is not None:
 
 
     # ========================================================
-    # DOWNLOAD FULL RESULTS
+    # EXCEL DOWNLOAD
     # ========================================================
 
     excel_data = create_excel_download(
-        df
+        df,
+        st.session_state.report_sales_manager,
+        st.session_state.report_reference,
+        st.session_state.report_datetime
+    )
+
+
+    safe_sales_manager = re.sub(
+        r'[\\/:*?"<>|]',
+        "",
+        st.session_state.report_sales_manager
+    ).strip()
+
+
+    if not safe_sales_manager:
+
+        safe_sales_manager = "Sales Manager"
+
+
+    excel_file_name = (
+        "Cross References - "
+        f"{safe_sales_manager} - "
+        f"{st.session_state.report_reference}.xlsx"
     )
 
 
@@ -1436,10 +2552,11 @@ if st.session_state.search_results is not None:
 
         st.write("")
 
+
         st.download_button(
             label="DOWNLOAD XLSX",
             data=excel_data,
-            file_name="LYNX_Cross_Results.xlsx",
+            file_name=excel_file_name,
             mime=(
                 "application/"
                 "vnd.openxmlformats-officedocument."
