@@ -822,6 +822,74 @@ def search_crosses(
 # ============================================================
 # ADD MANUAL CROSS
 # ============================================================
+def get_lynx_description(lynx_number):
+
+    lynx_number = str(
+        lynx_number
+    ).strip().upper()
+
+    if not lynx_number:
+        return ""
+
+    connection = duckdb.connect(
+        DATABASE_FILE,
+        read_only=True
+    )
+
+    try:
+
+        result = connection.execute(
+            """
+            SELECT description
+            FROM crosses
+            WHERE UPPER(TRIM(lynx_number)) = ?
+              AND description IS NOT NULL
+              AND TRIM(description) <> ''
+            LIMIT 1
+            """,
+            [lynx_number]
+        ).fetchone()
+
+    finally:
+
+        connection.close()
+
+    if result:
+        return str(result[0]).strip()
+
+    return ""
+
+
+def update_manual_description():
+
+    lynx_number = st.session_state.get(
+        "manual_lynx_number",
+        ""
+    )
+
+    description = get_lynx_description(
+        lynx_number
+    )
+
+    if description:
+
+        st.session_state[
+            "manual_description"
+        ] = description
+
+        st.session_state[
+            "manual_description_found"
+        ] = True
+
+    else:
+
+        st.session_state[
+            "manual_description"
+        ] = ""
+
+        st.session_state[
+            "manual_description_found"
+        ] = False
 
 def add_manual_cross(
     df,
@@ -2201,29 +2269,48 @@ if st.session_state.search_results is not None:
             )
 
 
-        with manual_col2:
+            with manual_col2:
 
-            manual_lynx_number = (
-                st.text_input(
-                    "LYNXauto Number",
-                    placeholder="e.g. G32877LR",
-                    key="manual_lynx_number"
+                manual_lynx_number = (
+                    st.text_input(
+                        "LYNXauto Number",
+                        placeholder="e.g. G32877LR",
+                        key="manual_lynx_number",
+                        on_change=update_manual_description
+                    )
                 )
-            )
 
 
-        with manual_col3:
+                with manual_col3:
 
-            manual_description = (
-                st.text_input(
-                    "Description (optional)",
-                    placeholder=(
-                        "Enter product description..."
-                    ),
-                    key="manual_description"
+                    manual_description = (
+                        st.text_input(
+                            "Description (optional)",
+                            placeholder=(
+                                "Enter product description..."
+                            ),
+                            key="manual_description"
+                        )
+                    )
+
+
+        if manual_lynx_number:
+
+            if st.session_state.get(
+                "manual_description_found",
+                False
+            ):
+
+                st.success(
+                    "Product found in LYNX database."
                 )
-            )
 
+            else:
+
+                st.info(
+                    "LYNX number not found in database. "
+                    "Enter description manually."
+                )
 
         add_manual_button = st.button(
             "ADD MANUAL CROSS",
