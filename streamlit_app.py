@@ -2731,6 +2731,7 @@ if st.session_state.search_results is not None:
             "Customer Part Number",
             "LYNXauto Number",
             "Description",
+            "Brand",
             "Cross Type",
             "Status"
         ],
