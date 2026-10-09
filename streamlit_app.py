@@ -666,6 +666,7 @@ def search_crosses(
                     "customer_display",
                     "lynx_number",
                     "description",
+                    "brand",
                     "source_type"
                 ]
             )
@@ -685,6 +686,7 @@ def search_crosses(
                         s.customer_display,
                         c.lynx_number,
                         c.description,
+                        c.brand,
                         c.source_type
                     FROM search_inputs s
                     INNER JOIN crosses c
@@ -706,6 +708,7 @@ def search_crosses(
                         s.customer_display,
                         c.lynx_number,
                         c.description,
+                        c.brand,
                         c.source_type
                     FROM search_inputs s
                     INNER JOIN crosses c
@@ -751,6 +754,7 @@ def search_crosses(
                 "Customer Part Number": customer_display,
                 "LYNXauto Number": "",
                 "Description": "",
+                "Brand": "",
                 "Cross Type": "",
                 "Status": ""
             })
@@ -776,6 +780,7 @@ def search_crosses(
                 "Customer Part Number": customer_display,
                 "LYNXauto Number": "",
                 "Description": "",
+                "Brand": "",
                 "Cross Type": "",
                 "Status": "Not Found"
             })
@@ -806,6 +811,9 @@ def search_crosses(
                 "Description":
                     str(match["description"]).strip(),
 
+                "Brand":
+                    str(match["brand"]).strip(),
+                
                 "Cross Type":
                     str(match["source_type"]).strip(),
 
@@ -1234,8 +1242,9 @@ def create_excel_download(
     worksheet.column_dimensions["B"].width = 30
     worksheet.column_dimensions["C"].width = 22
     worksheet.column_dimensions["D"].width = 36
-    worksheet.column_dimensions["E"].width = 21
-    worksheet.column_dimensions["F"].width = 18
+    worksheet.column_dimensions["E"].width = 22
+    worksheet.column_dimensions["F"].width = 21
+    worksheet.column_dimensions["G"].width = 18
 
 
     # ========================================================
@@ -1277,7 +1286,7 @@ def create_excel_download(
     # ========================================================
 
     worksheet.merge_cells(
-        "D1:F2"
+        "D1:G2"
     )
 
     worksheet["D1"] = (
@@ -1297,7 +1306,7 @@ def create_excel_download(
 
 
     worksheet.merge_cells(
-        "D3:F3"
+        "D3:G3"
     )
 
     worksheet["D3"] = (
@@ -1320,7 +1329,7 @@ def create_excel_download(
     # RED DIVIDER
     # ========================================================
 
-    for column in range(1, 7):
+    for column in range(1, 8):
 
         worksheet.cell(
             row=4,
@@ -1344,7 +1353,7 @@ def create_excel_download(
     worksheet["D6"] = "Date"
 
     worksheet.merge_cells(
-        "E6:F6"
+        "E6:G6"
     )
 
     worksheet["E6"] = (
@@ -1366,7 +1375,7 @@ def create_excel_download(
     worksheet["D7"] = "Prepared by"
 
     worksheet.merge_cells(
-        "E7:F7"
+        "E7:G7"
     )
 
     worksheet["E7"] = (
@@ -1421,6 +1430,7 @@ def create_excel_download(
         "Customer Part Number",
         "LYNXauto Number",
         "Description",
+        "Brand",
         "Cross Type",
         "Status"
     ]
@@ -1471,6 +1481,7 @@ def create_excel_download(
             row["Customer Part Number"],
             row["LYNXauto Number"],
             row["Description"],
+            row.get("Brand", ""),
             row["Cross Type"],
             row["Status"]
         ]
@@ -1536,7 +1547,7 @@ def create_excel_download(
 
         status_cell = worksheet.cell(
             row=row_index,
-            column=6
+            column=7
         )
 
 
@@ -1603,7 +1614,7 @@ def create_excel_download(
 
         table = Table(
             displayName="CrossReferencesTable",
-            ref=f"A9:F{last_row}"
+            ref=f"A9:G{last_row}"
         )
 
         style = TableStyleInfo(
@@ -1641,12 +1652,12 @@ def create_excel_download(
     if last_row >= start_row:
 
         worksheet.print_area = (
-            f"A1:F{last_row}"
+            f"A1:G{last_row}"
         )
 
     else:
 
-        worksheet.print_area = "A1:F10"
+        worksheet.print_area = "A1:G10"
 
 
     # ========================================================
