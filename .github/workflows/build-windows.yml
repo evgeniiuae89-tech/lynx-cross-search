@@ -24,8 +24,13 @@ jobs:
 
       - name: Build portable application
         run: |
-          pyinstaller --noconfirm --clean --onedir --name "LYNX Cross Search" --collect-all streamlit --collect-all duckdb --collect-all pyarrow --collect-all altair --collect-all pandas --collect-all openpyxl --copy-metadata streamlit --add-data "streamlit_app.py;." --add-data "assets;assets" launcher.py
-
+          pyinstaller --noconfirm --clean --onedir --name "LYNX Cross Search" --add-data "assets/akita_lynx_logo.png; --collect-all streamlit --collect-all duckdb --collect-all pyarrow --collect-all altair --collect-all pandas --collect-all openpyxl --copy-metadata streamlit --add-data "streamlit_app.py;." --add-data "assets;assets" launcher.py
+      
+      - name: Copy logo to application folder
+        run: |
+          New-Item -ItemType Directory -Force -Path "dist/LYNX Cross Search/assets"
+          Copy-Item "assets/akita_lynx_logo.png" "dist/LYNX Cross Search/assets/akita_lynx_logo.png"
+      
       - name: Upload portable application
         uses: actions/upload-artifact@v4
         with:
