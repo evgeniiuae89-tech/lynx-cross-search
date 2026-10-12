@@ -1,0 +1,34 @@
+name: Build Windows Portable
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build portable application
+        run: |
+          pyinstaller --noconfirm --clean --onedir --name "LYNX Cross Search" --collect-all streamlit --collect-all duckdb --collect-all pyarrow --collect-all altair --collect-all pandas --collect-all openpyxl --copy-metadata streamlit --add-data "streamlit_app.py;." --add-data "assets;assets" launcher.py
+
+      - name: Upload portable application
+        uses: actions/upload-artifact@v4
+        with:
+          name: LYNX-Cross-Search-Windows
+          path: dist/LYNX Cross Search/
+          retention-days: 7

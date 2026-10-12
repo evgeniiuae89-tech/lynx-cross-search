@@ -25,7 +25,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-DATABASE_FILE = "lynx_cross.duckdb"
+DATABASE_FILE = str(
+    Path.cwd() / "lynx_cross.duckdb"
+)
 LOGO_FILE = Path("assets/akita_lynx_logo.png")
 DUBAI_TIMEZONE = ZoneInfo("Asia/Dubai")
 
