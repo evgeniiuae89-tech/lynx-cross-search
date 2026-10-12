@@ -1,4 +1,5 @@
 import os
+os.environ["STREAMLIT_GLOBAL_DEVELOPMENT_MODE"] = "false"
 import sys
 import socket
 import threading
